@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request
-from flask_jwt_extended import JWTManager, jwt_required, create_access_token
+from flask_jwt_extended import JWTManager, verify_jwt_in_request, create_access_token
 from flask_mail import Mail, Message
 from flask_marshmallow import Marshmallow
 from flask_sqlalchemy import SQLAlchemy
@@ -68,8 +68,77 @@ def url_variables(name: str, age: int):
 @app.route("/planets", methods=["GET"])
 def planets():
     planets_list = Planet.query.all()
-    planets = planets_schema.dump(planets_list)
-    return jsonify(planets)
+    result = planets_schema.dump(planets_list)
+    return jsonify(result), 200
+
+
+@app.route("/planets/<int:planet_id>", methods=["GET"])
+def planet_details(planet_id: int):
+    planet = Planet.query.filter_by(planet_id=planet_id).first()
+    if planet:
+        result = planet_schema.dump(planet)
+        return jsonify(result), 200
+    else:
+        return jsonify(message="That planet does not exist"), 404
+
+
+@app.route("/planets", methods=["POST"])
+# ! @jwt_required
+def create_planet():
+    verify_jwt_in_request()  # Replacing the @jwt_required decorator.
+    planet_name = request.form["planet_name"]
+    test = Planet.query.filter_by(planet_name=planet_name).first()
+    if test:
+        return jsonify(message="That planet already exists."), 409
+    else:
+        planet_type = request.form["planet_type"]
+        home_star = request.form["home_star"]
+        mass = float(request.form["mass"])
+        radius = float(request.form["radius"])
+        distance = float(request.form["distance"])
+
+        new_planet = Planet(
+            planet_name=planet_name,
+            planet_type=planet_type,
+            home_star=home_star,
+            mass=mass,
+            radius=radius,
+            distance=distance,
+        )
+
+        db.session.add(new_planet)
+        db.session.commit()
+        return jsonify(message="You added the planet: " + planet_name), 201
+
+
+@app.route("/planets/<int:planet_id>", methods=["PUT"])
+def update_planet(planet_id: int):
+    verify_jwt_in_request()
+    planet = Planet.query.filter_by(planet_id=planet_id).first()
+    if planet:
+        planet_name = request.form["planet_name"]
+        planet.planet_name = planet_name
+        planet.planet_type = request.form["planet_type"]
+        planet.home_star = request.form["home_star"]
+        planet.mass = float(request.form["mass"])
+        planet.radius = float(request.form["radius"])
+        planet.distance = float(request.form["distance"])
+        db.session.commit()
+        return jsonify(message="You updated the planet: " + planet_name), 201
+    else:
+        return jsonify(message="That planet does not exist"), 404
+
+
+@app.route("/planets/<int:planet_id>", methods=["DELETE"])
+def delete_planet(planet_id: int):
+    verify_jwt_in_request()
+    planet = Planet.query.filter_by(planet_id=planet_id).first()
+    if planet:
+        db.session.delete(planet)
+        db.session.commit()
+        return jsonify(message="You deleted a planet"), 202
+    else:
+        return jsonify(message="That planet does not exist"), 404
 
 
 @app.route("/register", methods=["POST"])
@@ -120,9 +189,12 @@ def retrieve_password(email: str):
             recipients=[email],
         )
         mail.send(msg)
-        return jsonify(message="Password sent to " + email)
+        return jsonify(message="Password sent to " + email), 200
     else:
         return jsonify(message="That email doesn't exist"), 401
+
+
+# ? ===========================================================================
 
 
 # Database models definitions.
