@@ -156,3 +156,4 @@ restful-api-with-flask.code-workspace
 exercise-files.zip
 exercise-files/
 videos/
+app/planets.db
