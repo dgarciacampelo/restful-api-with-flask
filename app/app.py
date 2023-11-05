@@ -3,7 +3,8 @@ from flask_jwt_extended import JWTManager, verify_jwt_in_request, create_access_
 from flask_mail import Mail, Message
 from flask_marshmallow import Marshmallow
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Column, Integer, String, Float
+from sqlalchemy import Column, Integer, String, Float, ForeignKey
+from sqlalchemy.orm import relationship
 import os
 
 app = Flask(__name__)
@@ -216,6 +217,22 @@ user_schema = UserSchema()
 users_schema = UserSchema(many=True)
 
 
+class System(db.Model):
+    __tablename__ = "systems"
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    planets = relationship("Planet", back_populates="system")
+
+
+class SystemSchema(ma.Schema):
+    class Meta:
+        fields = ("id", "name")
+
+
+system_schema = SystemSchema()
+systems_schema = SystemSchema(many=True)
+
+
 class Planet(db.Model):
     __tablename__ = "planets"
     planet_id = Column(Integer, primary_key=True)
@@ -225,6 +242,9 @@ class Planet(db.Model):
     mass = Column(Float)
     radius = Column(Float)
     distance = Column(Float)
+    # Allow system_id to be null, because System was not part of the original course.
+    system_id = Column(Integer, ForeignKey("systems.id"), nullable=True)
+    system = relationship("System", back_populates="planets")
 
 
 class PlanetSchema(ma.Schema):
